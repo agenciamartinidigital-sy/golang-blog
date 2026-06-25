@@ -1,6 +1,9 @@
 package utils
 
-import "strings"
+import (
+	"regexp"
+	"strings"
+)
 
 var replacements = strings.NewReplacer(
 	"á", "a",
@@ -31,9 +34,12 @@ var replacements = strings.NewReplacer(
 	"ñ", "n", // usado em espanhol
 )
 
-func Slugify(s string) error {
-	strings.Replace(s string, old string, new string) string {
-		text := Slug.make()
-	}
+var rNunAlunum = regexp.MustCompile(`[^a-z0-9]+`)
 
+func Slugify(s string) string {
+	s = replacements.Replace(s)
+	s = strings.ToLower(s)
+	s = rNunAlunum.ReplaceAllString(s, "-")
+	s = strings.Trim(s, "-")
+	return s
 }
