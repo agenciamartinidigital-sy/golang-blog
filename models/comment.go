@@ -3,20 +3,7 @@ package models
 import (
 	"database/sql"
 	"fmt"
-	"time"
 )
-
-type Comment struct {
-	ID          int       `json:"id"`
-	PostID      int       `json:"post_id"`
-	PostTitle   string    `json:"post_title"`
-	PostSlug    string    `json:"post_slug"`
-	AuthorName  string    `json:"author_name"`
-	AuthorEmail string    `json:"author_email"`
-	Content     string    `json:"content"`
-	Status      string    `json:"status"`
-	CreatedAt   time.Time `json:"created_at"`
-}
 
 func GetApprovedCommentByPostID(db *sql.DB, postID int) ([]Comment, error) {
 	query := "SELECT id, post_id, author_name, author_email, content, status, created_at FROM comments WHERE post_id=? AND status='approved'"

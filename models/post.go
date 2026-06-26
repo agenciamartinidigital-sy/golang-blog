@@ -3,23 +3,7 @@ package models
 import (
 	"database/sql"
 	"fmt"
-	"time"
 )
-
-type Post struct {
-	ID          int          `json:"id"`
-	CategoryID  int          `json:"category_id"`
-	Title       string       `json:"title"`
-	Slug        string       `json:"slug"`
-	Content     string       `json:"content"`
-	Status      string       `json:"status"`
-	PublishedAt sql.NullTime `json:"published_at"`
-	CreatedAt   time.Time    `json:"created_at"`
-	UpdatedAt   time.Time    `json:"updated_at"`
-	Tags        []Tag        `json:"tags"`
-	Comments    []Comment    `json:"comments"`
-	Category    Category     `json:"category"`
-}
 
 func GetPublishedPosts(db *sql.DB) ([]Post, error) {
 	query := "SELECT p.id, p.category_id, p.title, p.slug, p.content, p.status, p.published_at, p.created_at, p.updated_at, c.id, c.name, c.slug FROM posts p JOIN categories c ON p.category_id = c.id WHERE p.status ='published' ORDER BY p.published_at DESC"
@@ -214,7 +198,7 @@ func DeletePost(db *sql.DB, postID int) error {
 		return fmt.Errorf("erro ao fazer o delete do post: %w", err)
 	}
 
-	if err := tx.Commit(); err != nil{
+	if err := tx.Commit(); err != nil {
 		return fmt.Errorf("Erro ao fazer o commit")
 	}
 	return nil

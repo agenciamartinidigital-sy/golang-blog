@@ -3,16 +3,7 @@ package models
 import (
 	"database/sql"
 	"fmt"
-	"time"
 )
-
-type Tag struct {
-	ID        int       `json:"id"`
-	Name      string    `json:"name"`
-	Slug      string    `json:"slug"`
-	CreatedAt time.Time `json:"created_at"`
-	UpdatedAt time.Time `json:"updated_at"`
-}
 
 func GetAllTags(db *sql.DB) ([]Tag, error) {
 	query := "SELECT id, name, slug, created_at, updated_at FROM tags"
