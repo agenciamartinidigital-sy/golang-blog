@@ -4,29 +4,11 @@ import (
 	"blog-golang/models"
 	"blog-golang/utils"
 	"database/sql"
-	"html/template"
 	"log"
 	"net/http"
 	"strconv"
 	"time"
 )
-
-type Handler struct {
-	db *sql.DB
-}
-
-func render(w http.ResponseWriter, tmpl string, data any) {
-	t, err := template.ParseFiles("templates/layout.html", tmpl)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	err = t.ExecuteTemplate(w, "layout", data)
-	if err != nil {
-		log.Printf("Erro ao executar o template %s: %v", tmpl, err)
-	}
-}
 
 func (h *Handler) PostIndex(w http.ResponseWriter, r *http.Request) {
 	posts, err := models.GetPublishedPosts(h.db)
@@ -90,10 +72,6 @@ func (h *Handler) AdminPostIndex(w http.ResponseWriter, r *http.Request) {
 }
 
 // Get
-type CreateTemplateData struct {
-	Categories []models.Category
-	Tags       []models.Tag
-}
 
 func (h *Handler) AdminPostNew(w http.ResponseWriter, r *http.Request) {
 	categories, err := models.GetAllCategories(h.db)
@@ -110,7 +88,7 @@ func (h *Handler) AdminPostNew(w http.ResponseWriter, r *http.Request) {
 		Categories: categories,
 		Tags:       tags,
 	}
-	render(w, "template/posts/new.html", viewData)
+	render(w, "templates/posts/new.html", viewData)
 }
 
 func (h *Handler) AdminPostCreate(w http.ResponseWriter, r *http.Request) {
@@ -150,14 +128,7 @@ func (h *Handler) AdminPostCreate(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Erro ao salvar o post no banco de dados", http.StatusInternalServerError)
 		return
 	}
-	http.Redirect(w, r, "templates/posts/new.html", http.StatusSeeOther)
-
-}
-
-type AdminPostEditData struct {
-	Post       models.Post
-	Categories []models.Category
-	Tags       []models.Tag
+	http.Redirect(w, r, "/admin/posts", http.StatusSeeOther)
 }
 
 func (h *Handler) AdminPostEdit(w http.ResponseWriter, r *http.Request) {
@@ -171,8 +142,9 @@ func (h *Handler) AdminPostEdit(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Post não encontrado", http.StatusNotFound)
 		return
 	}
-	if err != nil{
+	if err != nil {
 		http.Error(w, "Erro interno", http.StatusInternalServerError)
+		return
 	}
 	categories, err := models.GetAllCategories(h.db)
 	if err != nil {
@@ -185,7 +157,7 @@ func (h *Handler) AdminPostEdit(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	data := AdminPostEditData{
-		Post:      post,
+		Post:       post,
 		Categories: categories,
 		Tags:       tags,
 	}
@@ -193,9 +165,9 @@ func (h *Handler) AdminPostEdit(w http.ResponseWriter, r *http.Request) {
 	render(w, "templates/posts/edit.html", data)
 }
 
-func(h *Handler) AdminPostUpdate(db *sql.DB, w http.ResponseWriter, r *http.Request) {
+func (h *Handler) AdminPostUpdate(w http.ResponseWriter, r *http.Request) {
 	slug := r.PathValue("slug")
-	if slug == ""{
+	if slug == "" {
 		http.Error(w, "Slug não fornecido", http.StatusBadRequest)
 		return
 	}
@@ -209,11 +181,10 @@ func(h *Handler) AdminPostUpdate(db *sql.DB, w http.ResponseWriter, r *http.Requ
 	content := r.FormValue("content")
 	statusStr := r.FormValue("status")
 
-
 	newSlug := utils.Slugify(title)
 
 	categoryID, err := strconv.Atoi(r.FormValue("category_id"))
-	if err != nil{
+	if err != nil {
 		http.Error(w, "Categoria inválida", http.StatusBadRequest)
 		return
 	}
@@ -221,7 +192,7 @@ func(h *Handler) AdminPostUpdate(db *sql.DB, w http.ResponseWriter, r *http.Requ
 	tagString := r.Form["tags"]
 	tagIDs := make([]int, len(tagString))
 
-	for i, tagStr := range tagString{
+	for i, tagStr := range tagString {
 		id, err := strconv.Atoi(tagStr)
 		if err != nil {
 			http.Error(w, "Uma ou mais tags fornecidas são inválidas", http.StatusBadRequest)
@@ -229,17 +200,51 @@ func(h *Handler) AdminPostUpdate(db *sql.DB, w http.ResponseWriter, r *http.Requ
 		}
 		tagIDs[i] = id
 	}
-	var publishedAt sql.NullTime
 
-	statusInt := 0
-	if statusStr == "published"{
-		publishedAt = sql.NullTime{Time: time.Now(), Valid: true}
+	post, err := models.GetPostBySlug(h.db, slug)
+	if err == sql.ErrNoRows {
+		http.Error(w, "Post não encontrado", http.StatusNotFound)
+		return
+	}
+	if err != nil {
+		http.Error(w, "Erro interno", http.StatusInternalServerError)
+		return
+	}
+	var publishedAt sql.NullTime
+	if statusStr == "published" {
+		if post.PublishedAt.Valid {
+			publishedAt = post.PublishedAt
+		} else {
+			publishedAt = sql.NullTime{Time: time.Now(), Valid: true}
+		}
 	}
 
-	err = models.UpdatePost(h.db, slug, title, content, newSlug, categoryID, statusInt, publishedAt, tagIDs)
+	err = models.UpdatePost(h.db, title, content, newSlug, statusStr, post.ID, categoryID, publishedAt, tagIDs)
 	if err != nil {
 		http.Error(w, "Erro ao atualizar o post no banco de dados", http.StatusInternalServerError)
 		return
 	}
-	http.Redirect(w, r, "templates/admin/new.html", http.StatusSeeOther)
+	http.Redirect(w, r, "/admin/posts", http.StatusSeeOther)
+}
+
+func (h *Handler) AdminPostDelete(w http.ResponseWriter, r *http.Request) {
+	slug := r.PathValue("slug")
+
+	post, err := models.GetPostBySlug(h.db, slug)
+	if err == sql.ErrNoRows {
+		http.Error(w, "Não encotrado", http.StatusNotFound)
+		return
+	}
+	if err != nil {
+		log.Printf("AdminPostDelete: %v", err)
+		http.Error(w, "Error interno", http.StatusInternalServerError)
+		return
+	}
+	err = models.DeletePost(h.db, post.ID)
+	if err != nil {
+		http.Error(w, "Erro ao deletar", http.StatusInternalServerError)
+		return
+	}
+	http.Redirect(w, r, "/admin/posts", http.StatusSeeOther)
+
 }
